@@ -3,11 +3,21 @@ import pandas as pd
 import yfinance as yf
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, date, timedelta
 import json
 import os
 
 PORTFOLIO_FILE = os.path.join(os.path.dirname(__file__), "../data/portfolio.json")
+
+PERIODS = {
+    "Daily":   {"period": "5d",  "label": "1D"},
+    "Monthly": {"period": "1mo", "label": "1M"},
+    "YTD":     {"period": "ytd", "label": "YTD"},
+    "1 Year":  {"period": "1y",  "label": "1Y"},
+    "2 Year":  {"period": "2y",  "label": "2Y"},
+    "3 Year":  {"period": "3y",  "label": "3Y"},
+    "Total":   {"period": None,  "label": "Total"},
+}
 
 st.set_page_config(page_title="Stock Portfolio Tracker", layout="wide", page_icon="📈")
 st.title("📈 Stock Portfolio Tracker")
@@ -25,6 +35,35 @@ def save_portfolio(data):
     os.makedirs(os.path.dirname(PORTFOLIO_FILE), exist_ok=True)
     with open(PORTFOLIO_FILE, "w") as f:
         json.dump(data, f, indent=2)
+
+
+@st.cache_data(ttl=300)
+def fetch_history(tickers, period):
+    data = yf.download(tickers, period=period, auto_adjust=True, progress=False)["Close"]
+    if isinstance(data, pd.Series):
+        data = data.to_frame(name=tickers[0] if isinstance(tickers, list) else tickers)
+    return data
+
+
+def get_period_return(ticker, period_key, buy_price):
+    """Return (pct_change, price_start, price_now) for the given period."""
+    try:
+        t = yf.Ticker(ticker)
+        now = round(t.fast_info.last_price, 2)
+
+        if period_key == "Total":
+            pct = round((now - buy_price) / buy_price * 100, 2)
+            return pct, buy_price, now
+
+        period = PERIODS[period_key]["period"]
+        hist = t.history(period=period, auto_adjust=True)
+        if hist.empty:
+            return None, None, now
+        start_price = round(hist["Close"].iloc[0], 2)
+        pct = round((now - start_price) / start_price * 100, 2)
+        return pct, start_price, now
+    except Exception:
+        return None, None, None
 
 
 def fetch_prices(holdings):
@@ -49,8 +88,10 @@ def fetch_prices(holdings):
                 "Current Value": f"${current_value:.2f}",
                 "Gain/Loss ($)": gain_loss,
                 "Gain/Loss (%)": gain_loss_pct,
+                "_current_price": current_price,
                 "_current_value": current_value,
                 "_cost_basis": cost_basis,
+                "_buy_price": buy_price,
             })
         except Exception:
             rows.append({
@@ -62,10 +103,18 @@ def fetch_prices(holdings):
                 "Current Value": "N/A",
                 "Gain/Loss ($)": 0,
                 "Gain/Loss (%)": 0,
+                "_current_price": None,
                 "_current_value": 0,
                 "_cost_basis": buy_price * shares,
+                "_buy_price": buy_price,
             })
     return rows
+
+
+def color_val(val):
+    if isinstance(val, (int, float)):
+        return f"color: {'green' if val >= 0 else 'red'}"
+    return ""
 
 
 # Sidebar — manage holdings
@@ -103,8 +152,6 @@ else:
     with st.spinner("Fetching live prices..."):
         rows = fetch_prices(portfolio)
 
-    df = pd.DataFrame(rows)
-
     total_value = sum(r["_current_value"] for r in rows)
     total_cost = sum(r["_cost_basis"] for r in rows)
     total_gain = total_value - total_cost
@@ -119,56 +166,111 @@ else:
 
     st.divider()
 
-    # Holdings table
-    st.subheader("Holdings")
-    display_df = df.drop(columns=["_current_value", "_cost_basis"])
+    # ── Returns by Period ─────────────────────────────────────────────────────
+    st.subheader("Returns by Period")
+    selected_period = st.radio(
+        "Select period",
+        list(PERIODS.keys()),
+        horizontal=True,
+        index=0,
+    )
 
-    def color_gain(val):
-        if isinstance(val, (int, float)):
-            color = "green" if val >= 0 else "red"
-            return f"color: {color}"
-        return ""
+    with st.spinner(f"Loading {selected_period} returns..."):
+        period_rows = []
+        for r in rows:
+            ticker = r["Ticker"]
+            buy_price = r["_buy_price"]
+            pct, price_start, price_now = get_period_return(ticker, selected_period, buy_price)
+            shares = r["Shares"]
+            gain_dollar = round((price_now - price_start) * shares, 2) if price_start and price_now else None
+            period_rows.append({
+                "Ticker": ticker,
+                "Shares": shares,
+                "Start Price": f"${price_start:.2f}" if price_start else "N/A",
+                "Current Price": f"${price_now:.2f}" if price_now else "N/A",
+                f"Return ({selected_period}) $": gain_dollar,
+                f"Return ({selected_period}) %": pct,
+            })
 
-    styled = display_df.style.applymap(color_gain, subset=["Gain/Loss ($)", "Gain/Loss (%)"])
+    period_df = pd.DataFrame(period_rows)
+    ret_dollar_col = f"Return ({selected_period}) $"
+    ret_pct_col = f"Return ({selected_period}) %"
+
+    styled_period = period_df.style.applymap(color_val, subset=[ret_dollar_col, ret_pct_col])
+    st.dataframe(styled_period, use_container_width=True, hide_index=True)
+
+    # Period summary bar
+    valid = period_df[period_df[ret_pct_col].notna()]
+    if not valid.empty:
+        colors = ["green" if v >= 0 else "red" for v in valid[ret_pct_col]]
+        fig_period = go.Figure(go.Bar(
+            x=valid["Ticker"],
+            y=valid[ret_pct_col],
+            marker_color=colors,
+            text=[f"{v:.1f}%" for v in valid[ret_pct_col]],
+            textposition="outside",
+        ))
+        fig_period.update_layout(
+            yaxis_title=f"Return % ({selected_period})",
+            xaxis_title="Ticker",
+            height=400,
+        )
+        st.plotly_chart(fig_period, use_container_width=True)
+
+    st.divider()
+
+    # ── Holdings table ────────────────────────────────────────────────────────
+    st.subheader("All Holdings (Total Return)")
+    display_df = pd.DataFrame(rows).drop(columns=["_current_value", "_cost_basis", "_current_price", "_buy_price"])
+    styled = display_df.style.applymap(color_val, subset=["Gain/Loss ($)", "Gain/Loss (%)"])
     st.dataframe(styled, use_container_width=True, hide_index=True)
 
     st.divider()
 
-    # Charts
+    # ── Charts ────────────────────────────────────────────────────────────────
     col_a, col_b = st.columns(2)
 
     with col_a:
         st.subheader("Portfolio Allocation")
         pie_df = pd.DataFrame({
             "Ticker": [r["Ticker"] for r in rows],
-            "Value": [r["_current_value"] for r in rows]
+            "Value": [r["_current_value"] for r in rows],
         })
         fig_pie = px.pie(pie_df, names="Ticker", values="Value", hole=0.4)
         st.plotly_chart(fig_pie, use_container_width=True)
 
     with col_b:
-        st.subheader("Gain / Loss by Stock")
+        st.subheader("Total Gain / Loss by Stock")
         bar_df = pd.DataFrame({
             "Ticker": [r["Ticker"] for r in rows],
-            "Gain/Loss (%)": [r["Gain/Loss (%)"] for r in rows]
+            "Gain/Loss (%)": [r["Gain/Loss (%)"] for r in rows],
         })
         colors = ["green" if v >= 0 else "red" for v in bar_df["Gain/Loss (%)"]]
         fig_bar = go.Figure(go.Bar(
             x=bar_df["Ticker"],
             y=bar_df["Gain/Loss (%)"],
-            marker_color=colors
+            marker_color=colors,
         ))
         fig_bar.update_layout(yaxis_title="Gain/Loss (%)", xaxis_title="Ticker")
         st.plotly_chart(fig_bar, use_container_width=True)
 
-    # Price history
-    st.subheader("Price History (Last 3 Months)")
-    selected = st.multiselect("Select tickers", [h["ticker"] for h in portfolio], default=[h["ticker"] for h in portfolio[:3]])
-    if selected:
-        hist_data = yf.download(selected, period="3mo", auto_adjust=True, progress=False)["Close"]
-        if isinstance(hist_data, pd.Series):
-            hist_data = hist_data.to_frame(name=selected[0])
-        fig_line = px.line(hist_data, labels={"value": "Price ($)", "index": "Date"})
+    # ── Price history chart ───────────────────────────────────────────────────
+    st.subheader("Price History")
+    hist_period = st.select_slider(
+        "Chart period",
+        options=["1W", "1M", "3M", "6M", "YTD", "1Y", "2Y", "3Y", "Max"],
+        value="3M",
+    )
+    period_map = {"1W": "5d", "1M": "1mo", "3M": "3mo", "6M": "6mo",
+                  "YTD": "ytd", "1Y": "1y", "2Y": "2y", "3Y": "3y", "Max": "max"}
+    selected_tickers = st.multiselect(
+        "Select tickers",
+        [h["ticker"] for h in portfolio],
+        default=[h["ticker"] for h in portfolio[:5]],
+    )
+    if selected_tickers:
+        hist_data = fetch_history(tuple(selected_tickers), period_map[hist_period])
+        fig_line = px.line(hist_data, labels={"value": "Price ($)", "index": "Date", "variable": "Ticker"})
         st.plotly_chart(fig_line, use_container_width=True)
 
     st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
