@@ -255,7 +255,7 @@ else:
         st.plotly_chart(fig_bar, use_container_width=True)
 
     # ── Price history chart ───────────────────────────────────────────────────
-    st.subheader("Price History")
+    st.subheader("Price History vs Benchmarks")
     hist_period = st.select_slider(
         "Chart period",
         options=["1W", "1M", "3M", "6M", "YTD", "1Y", "2Y", "3Y", "Max"],
@@ -263,14 +263,48 @@ else:
     )
     period_map = {"1W": "5d", "1M": "1mo", "3M": "3mo", "6M": "6mo",
                   "YTD": "ytd", "1Y": "1y", "2Y": "2y", "3Y": "3y", "Max": "max"}
-    selected_tickers = st.multiselect(
-        "Select tickers",
-        [h["ticker"] for h in portfolio],
-        default=[h["ticker"] for h in portfolio[:5]],
-    )
-    if selected_tickers:
-        hist_data = fetch_history(tuple(selected_tickers), period_map[hist_period])
-        fig_line = px.line(hist_data, labels={"value": "Price ($)", "index": "Date", "variable": "Ticker"})
+
+    col_tickers, col_bench = st.columns([3, 1])
+    with col_tickers:
+        selected_tickers = st.multiselect(
+            "Select holdings to compare",
+            [h["ticker"] for h in portfolio],
+            default=[h["ticker"] for h in portfolio[:5]],
+        )
+    with col_bench:
+        show_spy = st.checkbox("SPY (S&P 500)", value=True)
+        show_qqq = st.checkbox("QQQ (Nasdaq 100)", value=True)
+
+    all_tickers = list(selected_tickers) + (["SPY"] if show_spy else []) + (["QQQ"] if show_qqq else [])
+
+    if all_tickers:
+        raw = fetch_history(tuple(all_tickers), period_map[hist_period])
+        # Normalize to % return from start so all tickers are comparable
+        normalized = (raw / raw.iloc[0] - 1) * 100
+        normalized.index.name = "Date"
+
+        fig_line = go.Figure()
+        for col in normalized.columns:
+            is_benchmark = col in ("SPY", "QQQ")
+            fig_line.add_trace(go.Scatter(
+                x=normalized.index,
+                y=normalized[col],
+                name=col,
+                line=dict(
+                    dash="dash" if is_benchmark else "solid",
+                    width=2.5 if is_benchmark else 1.5,
+                    color="#FFD700" if col == "SPY" else ("#00BFFF" if col == "QQQ" else None),
+                ),
+            ))
+        fig_line.update_layout(
+            yaxis_title="Return (%)",
+            xaxis_title="Date",
+            legend_title="Ticker",
+            hovermode="x unified",
+            height=500,
+        )
+        fig_line.add_hline(y=0, line_dash="dot", line_color="gray", opacity=0.5)
         st.plotly_chart(fig_line, use_container_width=True)
+        st.caption("Chart shows % return from start of selected period. SPY = S&P 500, QQQ = Nasdaq 100 (dashed).")
 
     st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
