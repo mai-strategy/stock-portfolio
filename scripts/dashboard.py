@@ -45,6 +45,45 @@ def fetch_history(tickers, period):
     return data
 
 
+@st.cache_data(ttl=300)
+def fetch_all_period_returns(holdings_tuple, period_key):
+    """Fetch returns for all holdings for a given period. Cached per period."""
+    holdings = list(holdings_tuple)
+    period_cfg = PERIODS[period_key]["period"]
+    tickers = [h["ticker"].upper() for h in holdings]
+    buy_prices = {h["ticker"].upper(): h["buy_price"] for h in holdings}
+    shares_map = {h["ticker"].upper(): h["shares"] for h in holdings}
+
+    results = []
+    try:
+        if period_key == "Total":
+            info_data = {t: yf.Ticker(t).fast_info.last_price for t in tickers}
+            for t in tickers:
+                now = round(info_data[t], 2)
+                bp = buy_prices[t]
+                pct = round((now - bp) / bp * 100, 2)
+                gain_dollar = round((now - bp) * shares_map[t], 2)
+                results.append({"Ticker": t, "Return %": pct, "Return $": gain_dollar, "Current Price": now})
+        else:
+            hist = yf.download(tickers, period=period_cfg, auto_adjust=True, progress=False)["Close"]
+            if isinstance(hist, pd.Series):
+                hist = hist.to_frame(name=tickers[0])
+            for t in tickers:
+                if t not in hist.columns:
+                    continue
+                col = hist[t].dropna()
+                if len(col) < 2:
+                    continue
+                start = round(col.iloc[0], 2)
+                now = round(col.iloc[-1], 2)
+                pct = round((now - start) / start * 100, 2)
+                gain_dollar = round((now - start) * shares_map[t], 2)
+                results.append({"Ticker": t, "Return %": pct, "Return $": gain_dollar, "Current Price": now})
+    except Exception:
+        pass
+    return results
+
+
 def get_period_return(ticker, period_key, buy_price):
     """Return (pct_change, price_start, price_now) for the given period."""
     try:
@@ -163,6 +202,59 @@ else:
     col2.metric("Total Cost Basis", f"${total_cost:,.2f}")
     col3.metric("Total Gain / Loss", f"${total_gain:,.2f}", f"{total_pct:.2f}%")
     col4.metric("Holdings", len(portfolio))
+
+    st.divider()
+
+    # ── Top & Bottom 3 Performers ─────────────────────────────────────────────
+    st.subheader("Top & Bottom 3 Performers")
+    perf_period = st.radio(
+        "Period",
+        ["Daily", "Monthly", "1 Year", "Total"],
+        horizontal=True,
+        key="perf_period",
+    )
+
+    with st.spinner(f"Loading {perf_period} performers..."):
+        all_returns = fetch_all_period_returns(
+            tuple({"ticker": h["ticker"], "buy_price": h["buy_price"], "shares": h["shares"]} for h in portfolio),
+            perf_period,
+        )
+
+    if all_returns:
+        perf_df = pd.DataFrame(all_returns).sort_values("Return %", ascending=False)
+        top3 = perf_df.head(3).copy()
+        bot3 = perf_df.tail(3).sort_values("Return %").copy()
+
+        def fmt_pct(v):
+            arrow = "▲" if v >= 0 else "▼"
+            return f"{arrow} {v:+.2f}%"
+
+        def fmt_dollar(v):
+            arrow = "▲" if v >= 0 else "▼"
+            return f"{arrow} ${v:+,.2f}"
+
+        for df in (top3, bot3):
+            df["Return %"] = df["Return %"].apply(fmt_pct)
+            df["Return $"] = df["Return $"].apply(fmt_dollar)
+            df["Current Price"] = df["Current Price"].apply(lambda v: f"${v:,.2f}")
+
+        col_top, col_bot = st.columns(2)
+
+        with col_top:
+            st.markdown("##### 🟢 Top 3")
+            st.dataframe(
+                top3[["Ticker", "Current Price", "Return %", "Return $"]],
+                use_container_width=True,
+                hide_index=True,
+            )
+
+        with col_bot:
+            st.markdown("##### 🔴 Bottom 3")
+            st.dataframe(
+                bot3[["Ticker", "Current Price", "Return %", "Return $"]],
+                use_container_width=True,
+                hide_index=True,
+            )
 
     st.divider()
 
