@@ -134,7 +134,8 @@ Dashboard runs at: **http://localhost:8501**
 ---
 
 ## Portfolio Snapshot (May 7, 2026)
-- **Total Value:** $455.86K
+- **Total Value:** $455.9K (incl. $2,360.03 cash)
+- **Note:** SavvyTrader shows 30 positions — 29 stocks + cash balance
 - **1 Day Return:** -1.09%
 - **1 Month Return:** +20.11%
 - **YTD Return:** +4.84%

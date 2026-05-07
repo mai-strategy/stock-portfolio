@@ -210,11 +210,13 @@ else:
     total_pct = (total_gain / total_cost * 100) if total_cost else 0
 
     # Summary metrics
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Portfolio Value", f"${total_value:,.2f}")
+    CASH_BALANCE = 2360.03  # updated from SavvyTrader — cash is counted as 30th position
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("Total Portfolio Value", f"${total_value + CASH_BALANCE:,.2f}")
     col2.metric("Total Cost Basis", f"${total_cost:,.2f}")
     col3.metric("Total Gain / Loss", f"${total_gain:,.2f}", f"{total_pct:.2f}%")
-    col4.metric("Holdings", len(portfolio))
+    col4.metric("Stock Positions", len(portfolio))
+    col5.metric("Cash Balance", f"${CASH_BALANCE:,.2f}")
 
     st.divider()
 
