@@ -7,7 +7,8 @@ from datetime import datetime, date, timedelta
 import json
 import os
 
-PORTFOLIO_FILE = os.path.join(os.path.dirname(__file__), "../data/portfolio.json")
+PORTFOLIO_FILE    = os.path.join(os.path.dirname(__file__), "../data/portfolio.json")
+TRANSACTIONS_FILE = os.path.join(os.path.dirname(__file__), "../data/transactions.json")
 
 PERIODS = {
     "Daily":   {"period": "5d",  "label": "1D"},
@@ -34,6 +35,18 @@ def load_portfolio():
 def save_portfolio(data):
     os.makedirs(os.path.dirname(PORTFOLIO_FILE), exist_ok=True)
     with open(PORTFOLIO_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def load_transactions():
+    if os.path.exists(TRANSACTIONS_FILE):
+        with open(TRANSACTIONS_FILE) as f:
+            return json.load(f)
+    return []
+
+
+def save_transactions(data):
+    with open(TRANSACTIONS_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
 
@@ -398,5 +411,90 @@ else:
         fig_line.add_hline(y=0, line_dash="dot", line_color="gray", opacity=0.5)
         st.plotly_chart(fig_line, use_container_width=True)
         st.caption("Chart shows % return from start of selected period. SPY = S&P 500, QQQ = Nasdaq 100 (dashed).")
+
+    st.divider()
+
+    # ── Transaction History ───────────────────────────────────────────────────
+    st.subheader("Transaction History")
+
+    transactions = load_transactions()
+
+    # Add new transaction form
+    with st.expander("+ Log New Transaction"):
+        with st.form("add_transaction"):
+            tc1, tc2, tc3, tc4, tc5 = st.columns([2, 1, 1, 1, 1])
+            with tc1:
+                t_ticker = st.text_input("Ticker").upper()
+            with tc2:
+                t_action = st.selectbox("Action", ["Buy", "Sell"])
+            with tc3:
+                t_shares = st.number_input("Shares", min_value=0.01, step=0.01)
+            with tc4:
+                t_price = st.number_input("Price ($)", min_value=0.01, step=0.01)
+            with tc5:
+                t_date = st.date_input("Date", value=date.today())
+            t_submitted = st.form_submit_button("Add Transaction")
+            if t_submitted and t_ticker:
+                transactions.insert(0, {
+                    "date": str(t_date),
+                    "ticker": t_ticker,
+                    "action": t_action,
+                    "shares": t_shares,
+                    "price": t_price,
+                })
+                save_transactions(transactions)
+                st.success(f"Transaction logged: {t_action} {t_shares} {t_ticker} @ ${t_price}")
+                st.rerun()
+
+    if transactions:
+        tx_df = pd.DataFrame(transactions)
+        tx_df["date"] = pd.to_datetime(tx_df["date"])
+        tx_df["Total Value"] = (tx_df["shares"] * tx_df["price"]).round(2)
+        tx_df = tx_df.sort_values("date", ascending=False)
+
+        today = pd.Timestamp(date.today())
+        week_ago  = today - timedelta(days=7)
+        month_ago = today - timedelta(days=30)
+
+        tab_daily, tab_weekly, tab_monthly, tab_all = st.tabs(["Today", "This Week", "This Month", "All Time"])
+
+        def render_tx(df):
+            if df.empty:
+                st.info("No transactions in this period.")
+                return
+            display = df.copy()
+            display["date"] = display["date"].dt.strftime("%b %d, %Y")
+            display["price"] = display["price"].apply(lambda x: f"${x:,.2f}")
+            display["Total Value"] = display["Total Value"].apply(lambda x: f"${x:,.2f}")
+            display.columns = ["Date", "Ticker", "Action", "Shares", "Price", "Total Value"]
+
+            def highlight_action(row):
+                color = "background-color: #d4edda" if row["Action"] == "Buy" else "background-color: #f8d7da"
+                return [color] * len(row)
+
+            st.dataframe(
+                display.style.apply(highlight_action, axis=1),
+                use_container_width=True,
+                hide_index=True,
+            )
+            buys  = df[df["action"] == "Buy"]["Total Value"].sum()
+            sells = df[df["action"] == "Sell"]["Total Value"].sum()
+            sc1, sc2, sc3 = st.columns(3)
+            sc1.metric("Transactions", len(df))
+            sc2.metric("Total Bought", f"${buys:,.2f}")
+            if sells > 0:
+                sc3.metric("Total Sold", f"${sells:,.2f}")
+
+        with tab_daily:
+            render_tx(tx_df[tx_df["date"].dt.date == date.today()])
+
+        with tab_weekly:
+            render_tx(tx_df[tx_df["date"] >= week_ago])
+
+        with tab_monthly:
+            render_tx(tx_df[tx_df["date"] >= month_ago])
+
+        with tab_all:
+            render_tx(tx_df)
 
     st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

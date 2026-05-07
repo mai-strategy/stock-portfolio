@@ -1,0 +1,14 @@
+[
+  {"date": "2026-05-07", "ticker": "LUNR", "action": "Buy", "shares": 40, "price": 23.77},
+  {"date": "2026-05-07", "ticker": "DGXX", "action": "Buy", "shares": 100, "price": 6.03},
+  {"date": "2026-05-07", "ticker": "FPS",  "action": "Buy", "shares": 10,  "price": 42.79},
+  {"date": "2026-05-06", "ticker": "DGXX", "action": "Buy", "shares": 100, "price": 5.90},
+  {"date": "2026-05-05", "ticker": "RDDT", "action": "Buy", "shares": 5,   "price": 170.70},
+  {"date": "2026-05-05", "ticker": "MU",   "action": "Buy", "shares": 1,   "price": 634.88},
+  {"date": "2026-05-05", "ticker": "ASTS", "action": "Buy", "shares": 10,  "price": 64.90},
+  {"date": "2026-05-05", "ticker": "ASTS", "action": "Buy", "shares": 5,   "price": 66.67},
+  {"date": "2026-05-05", "ticker": "NOW",  "action": "Buy", "shares": 5,   "price": 89.48},
+  {"date": "2026-05-04", "ticker": "NOW",  "action": "Buy", "shares": 5,   "price": 95.09},
+  {"date": "2026-04-16", "ticker": "ASTS", "action": "Buy", "shares": 5,   "price": 89.49},
+  {"date": "2026-04-15", "ticker": "RKLB", "action": "Buy", "shares": 15,  "price": 70.81}
+]
