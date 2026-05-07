@@ -14,7 +14,7 @@
   {"ticker": "CRWV", "shares": 55, "buy_price": 96.57},
   {"ticker": "AMKR", "shares": 75, "buy_price": 33.54},
   {"ticker": "RDDT", "shares": 30, "buy_price": 183.33},
-  {"ticker": "LUNR", "shares": 160, "buy_price": 17.71},
+  {"ticker": "LUNR", "shares": 200, "buy_price": 18.92},
   {"ticker": "GRAB", "shares": 1100, "buy_price": 5.13},
   {"ticker": "ZETA", "shares": 200, "buy_price": 18.41},
   {"ticker": "BMNR", "shares": 108, "buy_price": 44.49},
@@ -25,6 +25,7 @@
   {"ticker": "VG", "shares": 100, "buy_price": 6.95},
   {"ticker": "NOW", "shares": 10, "buy_price": 92.29},
   {"ticker": "MU", "shares": 1, "buy_price": 634.88},
-  {"ticker": "DGXX", "shares": 100, "buy_price": 5.90},
-  {"ticker": "RBRK", "shares": 10, "buy_price": 71.88}
+  {"ticker": "DGXX", "shares": 200, "buy_price": 5.96},
+  {"ticker": "RBRK", "shares": 10, "buy_price": 71.88},
+  {"ticker": "FPS", "shares": 10, "buy_price": 42.79}
 ]

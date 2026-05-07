@@ -97,7 +97,7 @@ Dashboard runs at: **http://localhost:8501**
 
 ---
 
-## Portfolio Holdings (28 positions as of May 6, 2026)
+## Portfolio Holdings (30 positions as of May 7, 2026)
 
 | Ticker | Company | Shares | Avg Buy Price |
 |--------|---------|--------|---------------|
@@ -116,7 +116,7 @@ Dashboard runs at: **http://localhost:8501**
 | CRWV | CoreWeave | 55 | $96.57 |
 | AMKR | Amkor Technology | 75 | $33.54 |
 | RDDT | Reddit | 30 | $183.33 |
-| LUNR | Intuitive Machines | 160 | $17.71 |
+| LUNR | Intuitive Machines | 200 | $18.92 *(updated: +40 shares)* |
 | GRAB | Grab Holdings | 1,100 | $5.13 |
 | ZETA | Zeta Global | 200 | $18.41 |
 | BMNR | BitMine Immersion | 108 | $44.49 |
@@ -127,14 +127,15 @@ Dashboard runs at: **http://localhost:8501**
 | VG | Venture Global | 100 | $6.95 |
 | NOW | ServiceNow | 10 | $92.29 |
 | MU | Micron Technology | 1 | $634.88 |
-| DGXX | Digi Power X | 100 | $5.90 |
+| DGXX | Digi Power X | 200 | $5.96 *(updated: +100 shares)* |
 | RBRK | Rubrik | 10 | $71.88 |
+| FPS | Forgent Power Solutions | 10 | $42.79 *(new)* |
 
 ---
 
-## Portfolio Snapshot (May 6, 2026)
-- **Total Value:** $460.87K
-- **1 Day Return:** +3.63%
+## Portfolio Snapshot (May 7, 2026)
+- **Total Value:** $455.86K
+- **1 Day Return:** -1.09%
 - **1 Month Return:** +20.11%
 - **YTD Return:** +4.84%
 - **1 Year Return:** +58.62%
